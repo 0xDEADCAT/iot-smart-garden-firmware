@@ -2,6 +2,8 @@
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 #include <iot_button.h>
+#include <nvs_flash.h>
+#include "esp_system.h"
 
 #include "app_priv.h"
 #include SMARTGARDEN_BOARD
@@ -12,11 +14,18 @@ static void push_btn_cb(void *arg)
     app_driver_set_state(!g_output_state);
 }
 
+static void button_press_3sec_cb(void *arg)
+{
+    nvs_flash_erase();
+    esp_restart();
+}
+
 static void configure_push_button(int gpio_num, void (*btn_cb)(void *))
 {
     button_handle_t btn_handle = iot_button_create(SMARTGARDEN_BOARD_BUTTON_GPIO, SMARTGARDEN_BOARD_BUTTON_ACTIVE_LEVEL);
     if (btn_handle) {
         iot_button_set_evt_cb(btn_handle, BUTTON_CB_RELEASE, btn_cb, "RELEASE");
+        iot_button_add_on_press_cb(btn_handle, 3, button_press_3sec_cb, NULL);
     }
 }
 
