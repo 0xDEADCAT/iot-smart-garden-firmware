@@ -3,6 +3,13 @@
         "task.h": "c",
         "manager.h": "c",
         "scheme_softap.h": "c",
-        "scheme_ble.h": "c"
+        "scheme_ble.h": "c",
+        "mqtt_client.h": "c",
+        "esp_wifi.h": "c",
+        "event_groups.h": "c",
+        "stdio.h": "c",
+        "app_wifi.h": "c",
+        "app_driver.h": "c",
+        "esp_netif.h": "c"
     }
 }

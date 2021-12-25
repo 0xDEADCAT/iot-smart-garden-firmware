@@ -1,12 +1,4 @@
-#include <freertos/FreeRTOS.h>
-#include <freertos/semphr.h>
-#include <freertos/task.h>
-#include <iot_button.h>
-#include <nvs_flash.h>
-#include "esp_system.h"
-
-#include "app_priv.h"
-#include SMARTGARDEN_BOARD
+#include "app_driver.h"
 
 static bool g_output_state;
 static void push_btn_cb(void *arg)

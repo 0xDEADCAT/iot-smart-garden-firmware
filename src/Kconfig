@@ -1,0 +1,9 @@
+menu "Smart Garden Configuration"
+
+    config BROKER_URL
+        string "Broker URL"
+        default "mqtt://hades"
+        help
+            URL of the broker
+
+endmenu
