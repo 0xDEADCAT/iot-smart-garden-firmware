@@ -14,15 +14,18 @@ static const adc_unit_t unit = ADC_UNIT_1;
 static void print_char_val_type(esp_adc_cal_value_t val_type)
 {
     if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
-        printf("Characterized using Two Point Value\n");
+        ESP_LOGI(TAG, "Characterized using Two Point Value");
     } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-        printf("Characterized using eFuse Vref\n");
+        ESP_LOGI(TAG, "Characterized using eFuse Vref");
     } else {
-        printf("Characterized using Default Vref\n");
+        ESP_LOGI(TAG, "Characterized using Default Vref");
     }
 }
 
 void app_sensor(void * pvParameters) {
+    QueueHandle_t mqttQueue = (QueueHandle_t) pvParameters;
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+
     // Configure adc
     adc1_config_width(width);
     adc1_config_channel_atten(channel, atten);
@@ -30,6 +33,7 @@ void app_sensor(void * pvParameters) {
     adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(unit, atten, width, DEFAULT_VREF, adc_chars);
     print_char_val_type(val_type);
+
     while (1) {
         uint32_t adc_reading = 0;
         // Multisampling
@@ -40,6 +44,7 @@ void app_sensor(void * pvParameters) {
         // Convert adc_reading to voltage in mV
         uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
         ESP_LOGI(TAG, "Raw: %d\tVoltage: %dmV", adc_reading, voltage);
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        xQueueSend(mqttQueue, (void*)&adc_reading, 0);
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }

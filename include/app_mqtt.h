@@ -16,6 +16,7 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
+#include <freertos/event_groups.h>
 
 #include <lwip/sockets.h>
 #include <lwip/dns.h>
@@ -23,6 +24,8 @@
 
 #include <mqtt_client.h>
 
-void app_mqtt_start(void);
+#define MQTT_CONNECTED_EVENT    BIT0
+
+void app_mqtt(void * pvParameters);
 
 #endif

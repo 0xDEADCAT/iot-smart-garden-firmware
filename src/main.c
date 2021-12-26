@@ -14,6 +14,7 @@
 static const char *TAG = "app_main";
 
 EventGroupHandle_t wifi_event_group = NULL;
+static QueueHandle_t mqttQueue = NULL;
 
 void app_main() {
     ESP_LOGI(TAG, "Smart Garden Application Started!");
@@ -23,12 +24,19 @@ void app_main() {
 
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
 
-    app_mqtt_start();
+    mqttQueue = xQueueCreate(5, sizeof(uint32_t));
+
+    xTaskCreate(app_mqtt,
+                "app_mqtt",
+                8192,
+                (void *) mqttQueue,
+                1,
+                NULL);
 
     xTaskCreate(app_sensor,
                 "app_sensor",
                 8192,
-                NULL,
+                (void *) mqttQueue,
                 1,
                 NULL);
 }

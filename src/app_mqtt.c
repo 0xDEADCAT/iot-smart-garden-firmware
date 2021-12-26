@@ -2,6 +2,8 @@
 
 static const char *TAG = "app_mqtt";
 
+EventGroupHandle_t mqtt_event_group = NULL;
+
 static void log_error_if_nonzero(const char * message, int error_code)
 {
     if (error_code != 0) {
@@ -11,32 +13,18 @@ static void log_error_if_nonzero(const char * message, int error_code)
 
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
-    esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
-    // your_context_t *context = event->context;
+
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
-            ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
-            ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
+            xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_EVENT);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            xEventGroupClearBits(mqtt_event_group, MQTT_CONNECTED_EVENT);
             break;
-
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
-            ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
@@ -71,8 +59,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     mqtt_event_handler_cb(event_data);
 }
 
-void app_mqtt_start(void)
+void app_mqtt(void * pvParameters)
 {
+    QueueHandle_t mqttQueue = (QueueHandle_t) pvParameters;
+    mqtt_event_group = xEventGroupCreate();
+
     esp_mqtt_client_config_t mqtt_cfg = {
         .uri = CONFIG_BROKER_URL,
     };
@@ -80,4 +71,16 @@ void app_mqtt_start(void)
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
+
+    uint32_t value;
+    char value_str[20];
+
+    while(1) {
+        xEventGroupWaitBits(mqtt_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
+        if(xQueueReceive(mqttQueue, &value, 0) == pdPASS) {
+            ESP_LOGI(TAG, "Received SENSOR VALUE: %d", value);
+            sprintf(value_str, "%d", value);
+            esp_mqtt_client_publish(client, "sensors/1/humidity", value_str, 0, 2, 0);
+        }
+    }
 }
