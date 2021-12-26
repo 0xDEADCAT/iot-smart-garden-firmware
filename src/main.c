@@ -9,6 +9,7 @@
 #include "app_driver.h"
 #include "app_wifi.h"
 #include "app_mqtt.h"
+#include "app_sensor.h"
 
 static const char *TAG = "app_main";
 
@@ -23,4 +24,11 @@ void app_main() {
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
 
     app_mqtt_start();
+
+    xTaskCreate(app_sensor,
+                "app_sensor",
+                8192,
+                NULL,
+                1,
+                NULL);
 }

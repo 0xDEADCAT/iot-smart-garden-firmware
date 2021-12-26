@@ -10,6 +10,7 @@
         "stdio.h": "c",
         "app_wifi.h": "c",
         "app_driver.h": "c",
-        "esp_netif.h": "c"
+        "esp_netif.h": "c",
+        "esp_event.h": "c"
     }
 }
