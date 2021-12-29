@@ -1,9 +1,24 @@
 menu "Smart Garden Configuration"
 
-    config BROKER_URL
-        string "Broker URL"
+    config MQTT_BROKER_URL
+        string "MQTT Broker URL"
         default "mqtt://hades"
         help
-            URL of the broker
+            URL of the MQTT broker the device will connect to.
+
+    choice
+        prompt "Select device type"
+        help
+            This option selects the device type.
+    config DEVICE_SENSOR
+        bool "Device - Sensor"
+        help
+            Device is used for soil moisture sensing.
+
+    config DEVICE_PUMP
+        bool "Device - Pump"
+        help
+            Device is used for pump control.
+    endchoice
 
 endmenu

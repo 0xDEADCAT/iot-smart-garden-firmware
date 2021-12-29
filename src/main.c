@@ -1,15 +1,17 @@
-
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
 #include <esp_log.h>
-
 #include <esp_event.h>
 
 #include "app_driver.h"
 #include "app_wifi.h"
 #include "app_mqtt.h"
+#if CONFIG_DEVICE_SENSOR
 #include "app_sensor.h"
+#elif CONFIG_DEVICE_PUMP
+#include "app_pump.h"
+#endif
 
 static const char *TAG = "app_main";
 
@@ -33,10 +35,21 @@ void app_main() {
                 1,
                 NULL);
 
+#if CONFIG_DEVICE_SENSOR
     xTaskCreate(app_sensor,
                 "app_sensor",
                 8192,
                 (void *) mqttQueue,
                 1,
                 NULL);
+#elif CONFIG_DEVICE_PUMP
+    xTaskCreate(app_pump,
+                "app_pump",
+                8192,
+                (void *) mqttQueue,
+                1,
+                NULL);
+#else
+    #error "Device type not specified in makeconfig!"
+#endif
 }
