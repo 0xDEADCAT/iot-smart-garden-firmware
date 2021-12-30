@@ -10,6 +10,7 @@ static const adc_channel_t channel = ADC_CHANNEL_4;
 static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
 static const adc_unit_t unit = ADC_UNIT_1;
+static struct dht11_reading dht11_reading;
 
 static void print_char_val_type(esp_adc_cal_value_t val_type)
 {
@@ -24,7 +25,9 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
 
 void app_sensor(void * pvParameters) {
     QueueHandle_t mqttQueue = (QueueHandle_t) pvParameters;
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    
+    // Initialize DHT sensor.
+    DHT11_init(GPIO_NUM_22);
 
     // Configure adc
     adc1_config_width(width);
@@ -35,7 +38,16 @@ void app_sensor(void * pvParameters) {
     print_char_val_type(val_type);
 
     while (1) {
+        dht11_reading = DHT11_read();
+        if (dht11_reading.status == DHT11_OK) {
+            ESP_LOGI(TAG, "Temperature: %d °C", dht11_reading.temperature);
+            ESP_LOGI(TAG, "Humidity: %d %%", dht11_reading.humidity);
+        } else {
+            ESP_LOGE(TAG, "DHT11 read error: %s", (dht11_reading.status == DHT11_CRC_ERROR) ? "CRC Error" : "Timeout");
+        }
+        
         uint32_t adc_reading = 0;
+        
         // Multisampling
         for (int i = 0; i < NO_OF_SAMPLES; i++) {
             adc_reading += adc1_get_raw((adc1_channel_t)channel);
@@ -43,7 +55,7 @@ void app_sensor(void * pvParameters) {
         adc_reading /= NO_OF_SAMPLES;
         // Convert adc_reading to voltage in mV
         uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
-        ESP_LOGI(TAG, "Raw: %d\tVoltage: %dmV", adc_reading, voltage);
+        ESP_LOGI(TAG, "Soil Moisture - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
         xQueueSend(mqttQueue, (void*)&adc_reading, 0);
         vTaskDelay(pdMS_TO_TICKS(10000));
     }

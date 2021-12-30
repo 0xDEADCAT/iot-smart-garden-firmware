@@ -11,6 +11,8 @@
         "app_wifi.h": "c",
         "app_driver.h": "c",
         "esp_netif.h": "c",
-        "esp_event.h": "c"
+        "esp_event.h": "c",
+        "freertos.h": "c",
+        "dht11.h": "c"
     }
 }

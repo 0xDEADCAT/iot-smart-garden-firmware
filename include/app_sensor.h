@@ -8,6 +8,7 @@
 #include <driver/adc.h>
 #include <esp_log.h>
 #include <esp_adc_cal.h>
+#include <dht11.h>
 
 #include SMARTGARDEN_BOARD
 
