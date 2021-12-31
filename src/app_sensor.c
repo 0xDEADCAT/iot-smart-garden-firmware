@@ -23,6 +23,17 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
     }
 }
 
+static float map_and_constrain(float x, float in_min, float in_max, float out_min, float out_max)
+{
+    float mapped_val = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    if (mapped_val > out_max) {
+        mapped_val = out_max;
+    } else if (mapped_val < out_min) {
+        mapped_val = out_min;
+    }
+    return mapped_val;
+}
+
 void app_sensor(void * pvParameters) {
     QueueHandle_t mqttQueue = (QueueHandle_t) pvParameters;
     
@@ -36,6 +47,8 @@ void app_sensor(void * pvParameters) {
     adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(unit, atten, width, DEFAULT_VREF, adc_chars);
     print_char_val_type(val_type);
+
+    float soil_moisture_percent = 0;
 
     while (1) {
         dht11_reading = DHT11_read();
@@ -55,6 +68,8 @@ void app_sensor(void * pvParameters) {
         adc_reading /= NO_OF_SAMPLES;
         // Convert adc_reading to voltage in mV
         uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
+        soil_moisture_percent = map_and_constrain(adc_reading, 3400, 1300, 0, 100);
+        ESP_LOGI(TAG, "Soil Moisture: %f %%", soil_moisture_percent);
         ESP_LOGI(TAG, "Soil Moisture - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
         xQueueSend(mqttQueue, (void*)&adc_reading, 0);
         vTaskDelay(pdMS_TO_TICKS(10000));
