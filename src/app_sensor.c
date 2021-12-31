@@ -49,12 +49,26 @@ void app_sensor(void * pvParameters) {
     print_char_val_type(val_type);
 
     float soil_moisture_percent = 0;
+    mqtt_message_t mqtt_message = {
+        .payload_len = 0,
+        .qos = 2,
+        .retain = 0
+    };
+    char buffer[16];
 
     while (1) {
         dht11_reading = DHT11_read();
         if (dht11_reading.status == DHT11_OK) {
             ESP_LOGI(TAG, "Temperature: %d °C", dht11_reading.temperature);
             ESP_LOGI(TAG, "Humidity: %d %%", dht11_reading.humidity);
+            sprintf(buffer, "%d", dht11_reading.temperature);
+            strcpy(mqtt_message.topic, "sensors/1/temperature");
+            strcpy(mqtt_message.payload, buffer);
+            xQueueSend(mqttQueue, &mqtt_message, portMAX_DELAY);
+            sprintf(buffer, "%d", dht11_reading.humidity);
+            strcpy(mqtt_message.topic, "sensors/1/humidity");
+            strcpy(mqtt_message.payload, buffer);
+            xQueueSend(mqttQueue, &mqtt_message, portMAX_DELAY);
         } else {
             ESP_LOGE(TAG, "DHT11 read error: %s", (dht11_reading.status == DHT11_CRC_ERROR) ? "CRC Error" : "Timeout");
         }
@@ -71,7 +85,10 @@ void app_sensor(void * pvParameters) {
         soil_moisture_percent = map_and_constrain(adc_reading, 3400, 1300, 0, 100);
         ESP_LOGI(TAG, "Soil Moisture: %f %%", soil_moisture_percent);
         ESP_LOGI(TAG, "Soil Moisture - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
-        xQueueSend(mqttQueue, (void*)&adc_reading, 0);
+        sprintf(buffer, "%.2f", soil_moisture_percent);
+        strcpy(mqtt_message.topic, "sensors/1/soil_moisture");
+        strcpy(mqtt_message.payload, buffer);
+        xQueueSend(mqttQueue, &mqtt_message, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }

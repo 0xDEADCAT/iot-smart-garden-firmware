@@ -10,6 +10,8 @@
 #include <esp_adc_cal.h>
 #include <dht11.h>
 
+#include "app_mqtt.h"
+
 #include SMARTGARDEN_BOARD
 
 void app_sensor(void * pvParameters);

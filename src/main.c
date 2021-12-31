@@ -26,7 +26,7 @@ void app_main() {
 
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
 
-    mqttQueue = xQueueCreate(5, sizeof(uint32_t));
+    mqttQueue = xQueueCreate(5, sizeof(mqtt_message_t));
 
     xTaskCreate(app_mqtt,
                 "app_mqtt",

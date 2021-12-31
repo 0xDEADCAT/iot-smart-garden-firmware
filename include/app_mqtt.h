@@ -26,6 +26,14 @@
 
 #define MQTT_CONNECTED_EVENT    BIT0
 
+typedef struct {
+    char topic[64];
+    char payload[64];
+    size_t payload_len;
+    size_t qos;
+    size_t retain;
+} mqtt_message_t;
+
 void app_mqtt(void * pvParameters);
 
 #endif

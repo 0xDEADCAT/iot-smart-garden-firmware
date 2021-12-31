@@ -72,15 +72,13 @@ void app_mqtt(void * pvParameters)
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
 
-    uint32_t value;
-    char value_str[20];
+    mqtt_message_t message;
 
     while(1) {
         xEventGroupWaitBits(mqtt_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
-        if(xQueueReceive(mqttQueue, &value, 0) == pdPASS) {
-            ESP_LOGI(TAG, "Received SENSOR VALUE: %d", value);
-            sprintf(value_str, "%d", value);
-            esp_mqtt_client_publish(client, "sensors/1/humidity", value_str, 0, 2, 0);
+        if(xQueueReceive(mqttQueue, &message, 0) == pdPASS) {
+            ESP_LOGI(TAG, "Publishing on topic: %s -> message: %s", message.topic, message.payload);
+            esp_mqtt_client_publish(client, message.topic, message.payload, message.payload_len, message.qos, message.retain);
         }
     }
 }
