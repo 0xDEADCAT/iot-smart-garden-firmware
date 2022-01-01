@@ -34,6 +34,11 @@ typedef struct {
     size_t retain;
 } mqtt_message_t;
 
+typedef struct {
+    QueueHandle_t incomingQueue;
+    QueueHandle_t outgoingQueue;
+} queue_holder_t;
+
 void app_mqtt(void * pvParameters);
 
 #endif

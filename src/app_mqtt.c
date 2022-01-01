@@ -3,6 +3,7 @@
 static const char *TAG = "app_mqtt";
 
 EventGroupHandle_t mqtt_event_group = NULL;
+static queue_holder_t mqttQueues;
 
 static void log_error_if_nonzero(const char * message, int error_code)
 {
@@ -13,11 +14,19 @@ static void log_error_if_nonzero(const char * message, int error_code)
 
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
-
+#if CONFIG_DEVICE_PUMP
+    esp_mqtt_client_handle_t client = event->client;
+    int msg_id;
+#endif
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
             xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_EVENT);
+
+#if CONFIG_DEVICE_PUMP
+            msg_id = esp_mqtt_client_subscribe(client, "pumps/1/state", 2);
+            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+#endif
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -36,6 +45,15 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
             printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
             printf("DATA=%.*s\r\n", event->data_len, event->data);
+#if CONFIG_DEVICE_PUMP
+            mqtt_message_t message = {
+                .payload_len = event->data_len,
+                .retain = event->retain
+            };
+            strncpy(message.topic, event->topic, event->topic_len);
+            strncpy(message.payload, event->data, event->data_len);
+            xQueueSend(mqttQueues.incomingQueue, &message, portMAX_DELAY);
+#endif
             break;
         case MQTT_EVENT_ERROR:
             ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -61,7 +79,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void app_mqtt(void * pvParameters)
 {
-    QueueHandle_t mqttQueue = (QueueHandle_t) pvParameters;
+    mqttQueues = *(queue_holder_t*) pvParameters;
     mqtt_event_group = xEventGroupCreate();
 
     esp_mqtt_client_config_t mqtt_cfg = {
@@ -76,7 +94,7 @@ void app_mqtt(void * pvParameters)
 
     while(1) {
         xEventGroupWaitBits(mqtt_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
-        if(xQueueReceive(mqttQueue, &message, 0) == pdPASS) {
+        if(xQueueReceive(mqttQueues.outgoingQueue, &message, 0) == pdPASS) {
             ESP_LOGI(TAG, "Publishing on topic: %s -> message: %s", message.topic, message.payload);
             esp_mqtt_client_publish(client, message.topic, message.payload, message.payload_len, message.qos, message.retain);
         }

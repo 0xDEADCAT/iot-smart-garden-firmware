@@ -35,7 +35,7 @@ static float map_and_constrain(float x, float in_min, float in_max, float out_mi
 }
 
 void app_sensor(void * pvParameters) {
-    QueueHandle_t mqttQueue = (QueueHandle_t) pvParameters;
+    queue_holder_t mqttQueues = *(queue_holder_t*) pvParameters;
     
     // Initialize DHT sensor.
     DHT11_init(GPIO_NUM_22);
@@ -64,11 +64,11 @@ void app_sensor(void * pvParameters) {
             sprintf(buffer, "%d", dht11_reading.temperature);
             strcpy(mqtt_message.topic, "sensors/1/temperature");
             strcpy(mqtt_message.payload, buffer);
-            xQueueSend(mqttQueue, &mqtt_message, portMAX_DELAY);
+            xQueueSend(mqttQueues.outgoingQueue, &mqtt_message, portMAX_DELAY);
             sprintf(buffer, "%d", dht11_reading.humidity);
             strcpy(mqtt_message.topic, "sensors/1/humidity");
             strcpy(mqtt_message.payload, buffer);
-            xQueueSend(mqttQueue, &mqtt_message, portMAX_DELAY);
+            xQueueSend(mqttQueues.outgoingQueue, &mqtt_message, portMAX_DELAY);
         } else {
             ESP_LOGE(TAG, "DHT11 read error: %s", (dht11_reading.status == DHT11_CRC_ERROR) ? "CRC Error" : "Timeout");
         }
@@ -88,7 +88,7 @@ void app_sensor(void * pvParameters) {
         sprintf(buffer, "%.2f", soil_moisture_percent);
         strcpy(mqtt_message.topic, "sensors/1/soil_moisture");
         strcpy(mqtt_message.payload, buffer);
-        xQueueSend(mqttQueue, &mqtt_message, portMAX_DELAY);
+        xQueueSend(mqttQueues.outgoingQueue, &mqtt_message, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
