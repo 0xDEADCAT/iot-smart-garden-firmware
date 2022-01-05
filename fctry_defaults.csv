@@ -1,0 +1,3 @@
+key,type,encoding,value
+fctry_ns,namespace,,
+device_id,data,string,1

@@ -11,6 +11,7 @@ static const adc_bits_width_t width = ADC_WIDTH_BIT_12;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
 static const adc_unit_t unit = ADC_UNIT_1;
 static struct dht11_reading dht11_reading;
+static char *device_id;
 
 static void print_char_val_type(esp_adc_cal_value_t val_type)
 {
@@ -35,7 +36,31 @@ static float map_and_constrain(float x, float in_min, float in_max, float out_mi
 }
 
 void app_sensor(void * pvParameters) {
+    ESP_LOGI(TAG, "Starting sensor task...");
+
     queue_holder_t mqttQueues = *(queue_holder_t*) pvParameters;
+
+    // Get device ID from fctry partition
+    nvs_handle fctry_handle;
+    if (nvs_flash_init_partition(FCTRY_PARTITION_NAME) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+    if (nvs_open_from_partition(FCTRY_PARTITION_NAME, "fctry_ns", NVS_READWRITE, &fctry_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+    size_t device_id_len;
+
+    if (nvs_get_str(fctry_handle, "device_id", NULL, &device_id_len) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device_id length from %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+    device_id = malloc(device_id_len);
+    if (nvs_get_str(fctry_handle, "device_id", device_id, &device_id_len) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device_id from %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
     
     // Initialize DHT sensor.
     DHT11_init(GPIO_NUM_22);
@@ -54,7 +79,7 @@ void app_sensor(void * pvParameters) {
         .qos = 2,
         .retain = 0
     };
-    char buffer[16];
+    char buffer[16], topic[32];
 
     while (1) {
         dht11_reading = DHT11_read();
@@ -62,11 +87,13 @@ void app_sensor(void * pvParameters) {
             ESP_LOGI(TAG, "Temperature: %d °C", dht11_reading.temperature);
             ESP_LOGI(TAG, "Humidity: %d %%", dht11_reading.humidity);
             sprintf(buffer, "%d", dht11_reading.temperature);
-            strcpy(mqtt_message.topic, "sensors/1/temperature");
+            sprintf(topic, "sensors/%s/temperature", device_id);
+            strcpy(mqtt_message.topic, topic);
             strcpy(mqtt_message.payload, buffer);
             xQueueSend(mqttQueues.outgoingQueue, &mqtt_message, portMAX_DELAY);
             sprintf(buffer, "%d", dht11_reading.humidity);
-            strcpy(mqtt_message.topic, "sensors/1/humidity");
+            sprintf(topic, "sensors/%s/humidity", device_id);
+            strcpy(mqtt_message.topic, topic);
             strcpy(mqtt_message.payload, buffer);
             xQueueSend(mqttQueues.outgoingQueue, &mqtt_message, portMAX_DELAY);
         } else {
@@ -86,7 +113,8 @@ void app_sensor(void * pvParameters) {
         ESP_LOGI(TAG, "Soil Moisture: %f %%", soil_moisture_percent);
         ESP_LOGI(TAG, "Soil Moisture - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
         sprintf(buffer, "%.2f", soil_moisture_percent);
-        strcpy(mqtt_message.topic, "sensors/1/soil_moisture");
+        sprintf(topic, "sensors/%s/soil_moisture", device_id);
+        strcpy(mqtt_message.topic, topic);
         strcpy(mqtt_message.payload, buffer);
         xQueueSend(mqttQueues.outgoingQueue, &mqtt_message, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(10000));
