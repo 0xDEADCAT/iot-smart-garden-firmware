@@ -22,7 +22,11 @@
 #include <lwip/dns.h>
 #include <lwip/netdb.h>
 
+#include <nvs_flash.h>
+
 #include <mqtt_client.h>
+
+#define FCTRY_PARTITION_NAME "fctry"
 
 #define MQTT_CONNECTED_EVENT    BIT0
 

@@ -4,6 +4,7 @@ static const char *TAG = "app_mqtt";
 
 EventGroupHandle_t mqtt_event_group = NULL;
 static queue_holder_t mqttQueues;
+static char *device_id;
 
 static void log_error_if_nonzero(const char * message, int error_code)
 {
@@ -24,7 +25,9 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_EVENT);
 
 #if CONFIG_DEVICE_PUMP
-            msg_id = esp_mqtt_client_subscribe(client, "pumps/1/state", 2);
+            char topic[32];
+            sprintf(topic, "pumps/%s/activate", device_id);
+            msg_id = esp_mqtt_client_subscribe(client, topic, 2);
             ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 #endif
             break;
@@ -79,6 +82,28 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void app_mqtt(void * pvParameters)
 {
+    // Get device ID from fctry partition
+    nvs_handle fctry_handle;
+    if (nvs_flash_init_partition(FCTRY_PARTITION_NAME) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+    if (nvs_open_from_partition(FCTRY_PARTITION_NAME, "fctry_ns", NVS_READWRITE, &fctry_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+    size_t device_id_len;
+
+    if (nvs_get_str(fctry_handle, "device_id", NULL, &device_id_len) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device_id length from %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+    device_id = malloc(device_id_len);
+    if (nvs_get_str(fctry_handle, "device_id", device_id, &device_id_len) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device_id from %s NVS partition", FCTRY_PARTITION_NAME);
+        return;
+    }
+
     mqttQueues = *(queue_holder_t*) pvParameters;
     mqtt_event_group = xEventGroupCreate();
 
