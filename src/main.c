@@ -29,13 +29,6 @@ void app_main() {
     mqttQueues.incomingQueue = xQueueCreate(10, sizeof(mqtt_message_t));
     mqttQueues.outgoingQueue = xQueueCreate(10, sizeof(mqtt_message_t));
 
-    xTaskCreate(app_mqtt,
-                "app_mqtt",
-                8192,
-                (void *) &mqttQueues,
-                1,
-                NULL);
-
 #if CONFIG_DEVICE_SENSOR
     xTaskCreate(app_sensor,
                 "app_sensor",
@@ -43,14 +36,21 @@ void app_main() {
                 (void *) &mqttQueues,
                 1,
                 NULL);
-#elif CONFIG_DEVICE_PUMP
+#endif
+
+    xTaskCreate(app_mqtt,
+                "app_mqtt",
+                8192,
+                (void *) &mqttQueues,
+                1,
+                NULL);
+
+#if CONFIG_DEVICE_PUMP
     xTaskCreate(app_pump,
                 "app_pump",
                 8192,
                 (void *) &mqttQueues,
                 1,
                 NULL);
-#else
-    #error "Device type not specified in makeconfig!"
 #endif
 }

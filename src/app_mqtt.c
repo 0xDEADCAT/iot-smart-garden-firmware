@@ -5,6 +5,10 @@ static const char *TAG = "app_mqtt";
 EventGroupHandle_t mqtt_event_group = NULL;
 static queue_holder_t mqttQueues;
 static char *device_id;
+#if CONFIG_DEVICE_SENSOR
+static TaskHandle_t sensor_task_handle = NULL;
+int sleep_time_msg_id = -1;
+#endif
 
 static void log_error_if_nonzero(const char * message, int error_code)
 {
@@ -15,10 +19,8 @@ static void log_error_if_nonzero(const char * message, int error_code)
 
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
-#if CONFIG_DEVICE_PUMP
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
-#endif
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
@@ -29,6 +31,12 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             sprintf(topic, "pumps/%s/activate", device_id);
             msg_id = esp_mqtt_client_subscribe(client, topic, 2);
             ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+#elif CONFIG_DEVICE_SENSOR
+            char topic[32];
+            sprintf(topic, "sensors/%s/sleep_time", device_id);
+            msg_id = esp_mqtt_client_subscribe(client, topic, 2);
+            sleep_time_msg_id = msg_id;
+            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 #endif
             break;
         case MQTT_EVENT_DISCONNECTED:
@@ -36,6 +44,11 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             xEventGroupClearBits(mqtt_event_group, MQTT_CONNECTED_EVENT);
             break;
         case MQTT_EVENT_SUBSCRIBED:
+#if CONFIG_DEVICE_SENSOR
+            if (event->msg_id == sleep_time_msg_id) {
+                xTaskNotify(sensor_task_handle, 0, eNoAction);
+            }
+#endif
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
@@ -43,12 +56,14 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             break;
         case MQTT_EVENT_PUBLISHED:
             ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+#if CONFIG_DEVICE_SENSOR
+            xTaskNotify(sensor_task_handle, 0, eIncrement);
+#endif
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
             printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
             printf("DATA=%.*s\r\n", event->data_len, event->data);
-#if CONFIG_DEVICE_PUMP
             mqtt_message_t message = {
                 .payload_len = event->data_len,
                 .retain = event->retain
@@ -56,7 +71,6 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             strncpy(message.topic, event->topic, event->topic_len);
             strncpy(message.payload, event->data, event->data_len);
             xQueueSend(mqttQueues.incomingQueue, &message, portMAX_DELAY);
-#endif
             break;
         case MQTT_EVENT_ERROR:
             ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -104,6 +118,14 @@ void app_mqtt(void * pvParameters)
         return;
     }
 
+#if CONFIG_DEVICE_SENSOR
+    sensor_task_handle = xTaskGetHandle("app_sensor");
+
+    configASSERT(sensor_task_handle);
+
+    xTaskNotifyStateClear(NULL);
+#endif
+
     mqttQueues = *(queue_holder_t*) pvParameters;
     mqtt_event_group = xEventGroupCreate();
 
@@ -117,8 +139,17 @@ void app_mqtt(void * pvParameters)
 
     mqtt_message_t message;
 
+    xEventGroupWaitBits(mqtt_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
     while(1) {
-        xEventGroupWaitBits(mqtt_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
+#if CONFIG_DEVICE_SENSOR
+        if (xTaskNotifyWait(0, 0, NULL, 0) == pdTRUE) {
+            ESP_LOGI(TAG, "Got notification, exiting loop.");
+            esp_mqtt_client_disconnect(client);
+            esp_mqtt_client_stop(client);
+            xTaskNotify(sensor_task_handle, 0, eIncrement);
+            vTaskDelete(NULL);
+        }
+#endif
         if(xQueueReceive(mqttQueues.outgoingQueue, &message, 0) == pdPASS) {
             ESP_LOGI(TAG, "Publishing on topic: %s -> message: %s", message.topic, message.payload);
             esp_mqtt_client_publish(client, message.topic, message.payload, message.payload_len, message.qos, message.retain);

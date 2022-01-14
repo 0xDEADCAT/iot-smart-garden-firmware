@@ -21,6 +21,13 @@ menu "Smart Garden Configuration"
             Device is used for pump control.
     endchoice
 
+    config SENSOR_DEEPSLEEP_TIME
+        int "Sensor - Deepsleep time"
+        default 30
+        depends on DEVICE_SENSOR
+        help
+            Sensor deepsleep time in seconds.
+
     config PUMP_RESET_TIMER_PERIOD
         int "Time in ms for pump to turn off"
         default 2000
