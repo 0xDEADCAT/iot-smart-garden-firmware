@@ -75,5 +75,5 @@ dkms.conf
 
 # Application project files
 **/sdkconfig
-**/sdkconfig.*
+**/sdkconfig.*.old
 **/build
